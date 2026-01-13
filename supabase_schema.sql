@@ -19,10 +19,21 @@ CREATE TABLE IF NOT EXISTS config (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- TABLA DE GASTOS ADICIONALES MENSUALES
+CREATE TABLE IF NOT EXISTS monthly_expenses (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    month TEXT NOT NULL, -- Formato YYYY-MM
+    name TEXT NOT NULL,
+    amount NUMERIC NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Habilitar RLS (Row Level Security) - Por ahora permitimos todo para facilitar el inicio
 -- PERO es recomendable configurar políticas reales más adelante.
 ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE monthly_expenses ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow all for anon" ON sales FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all for anon" ON config FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all for anon" ON monthly_expenses FOR ALL USING (true) WITH CHECK (true);

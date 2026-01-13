@@ -27,8 +27,8 @@ const DEFAULT_CONFIG = {
   },
   partners: {
     principal: { name: 'Socio Principal', percentage: 60 },
-    menor1: { name: 'Socio Menor 1', percentage: 20 },
-    menor2: { name: 'Socio Menor 2', percentage: 20 }
+    menor1: { name: 'Socio 2', percentage: 20 },
+    menor2: { name: 'Socio 3', percentage: 20 }
   },
   expenses: [
     { id: 'empleados', name: 'Empleados', amount: 3000000 },
@@ -56,6 +56,7 @@ const MONTHS = [
 class SalesManager {
   constructor() {
     this.sales = [];
+    this.monthlyExpenses = [];
     this.config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
     this.currentTab = 'dashboard';
     this.selectedDate = new Date().toISOString().split('T')[0];
@@ -243,6 +244,15 @@ class SalesManager {
           createdAt: s.created_at
         }));
       }
+
+      const { data: expData, error: expError } = await supabase
+        .from('monthly_expenses')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (expData) {
+        this.monthlyExpenses = expData;
+      }
     } catch (err) {
       console.error('Error loading:', err);
     }
@@ -308,6 +318,34 @@ class SalesManager {
       this.sales = this.sales.filter(s => s.id !== id);
       return true;
     } catch (err) {
+      return false;
+    }
+  }
+
+  async addMonthlyExpense(name, amount, month) {
+    try {
+      const { data, error } = await supabase
+        .from('monthly_expenses')
+        .insert({ name, amount, month })
+        .select()
+        .single();
+      if (error) throw error;
+      if (data) this.monthlyExpenses.push(data);
+      return data;
+    } catch (err) {
+      console.error('Add monthly expense error:', err);
+      return null;
+    }
+  }
+
+  async deleteMonthlyExpense(id) {
+    try {
+      const { error } = await supabase.from('monthly_expenses').delete().eq('id', id);
+      if (error) throw error;
+      this.monthlyExpenses = this.monthlyExpenses.filter(e => e.id !== id);
+      return true;
+    } catch (err) {
+      console.error('Delete monthly expense error:', err);
       return false;
     }
   }
@@ -459,12 +497,52 @@ class SalesManager {
     return this.config.expenses.reduce((t, e) => t + e.amount, 0);
   }
 
-  calculateProfit(sales = this.sales) {
-    return this.calculateNetSales(sales) - this.calculateTotalExpenses();
+  calculateProductCost(sales = this.sales) {
+    return this.calculateGrossSales(sales) / 1.5;
   }
 
-  calculatePartnerDistribution(sales = this.sales) {
-    const profit = this.calculateProfit(sales);
+  // Utilidad Bruta = Ventas Totales - Costo Mercadería (Ventas/1.5)
+  calculateGrossProfit(sales = this.sales) {
+    const grossSales = this.calculateGrossSales(sales);
+    const productCost = this.calculateProductCost(sales);
+    return grossSales - productCost;
+  }
+
+  // Utilidad Neta = Utilidad Bruta - Gastos Fijos - Gastos Mensuales Extra
+  calculateProfit(sales = this.sales, month = this.dashboardMonth) {
+    const grossProfit = this.calculateGrossProfit(sales);
+    const fixedExpenses = this.calculateTotalExpenses();
+    const monthlyExtraExpenses = this.monthlyExpenses
+      .filter(e => e.month === month)
+      .reduce((t, e) => t + e.amount, 0);
+
+    return grossProfit - fixedExpenses - monthlyExtraExpenses;
+  }
+
+  // Punto de Equilibrio: Ventas mínimas para cubrir gastos (Fijos + Extra del mes)
+  calculateBreakEven(month = this.dashboardMonth) {
+    const fixedExpenses = this.calculateTotalExpenses();
+    const monthlyExtraExpenses = this.monthlyExpenses
+      .filter(e => e.month === month)
+      .reduce((t, e) => t + e.amount, 0);
+    const totalExpenses = fixedExpenses + monthlyExtraExpenses;
+    return totalExpenses * 3; // Equivalent to totalExpenses / (1 - 1/1.5)
+  }
+
+  // Venta para que un socio de 20% gane $1,000,000
+  calculateTargetRevenue(month = this.dashboardMonth) {
+    const fixedExpenses = this.calculateTotalExpenses();
+    const monthlyExtraExpenses = this.monthlyExpenses
+      .filter(e => e.month === month)
+      .reduce((t, e) => t + e.amount, 0);
+    const totalExpenses = fixedExpenses + monthlyExtraExpenses;
+    // Objetivo de Utilidad Neta Total = 1,000,000 / 0.2 = 5,000,000
+    const targetNetProfit = 5000000;
+    return (targetNetProfit + totalExpenses) * 3;
+  }
+
+  calculatePartnerDistribution(sales = this.sales, month = this.dashboardMonth) {
+    const profit = this.calculateProfit(sales, month);
     return {
       principal: profit * (this.config.partners.principal.percentage / 100),
       menor1: profit * (this.config.partners.menor1.percentage / 100),
@@ -510,7 +588,6 @@ class SalesManager {
 
   renderDashboard(container) {
     const monthSales = this.getDashboardSales();
-    const todaySales = this.getTodaySales();
     const dist = this.calculatePartnerDistribution(monthSales);
 
     // Get month name for display
@@ -518,34 +595,97 @@ class SalesManager {
     const displayMonth = `${MONTHS[parseInt(month) - 1]} ${year}`;
     const availableMonths = this.getAvailableMonths();
 
-    // Solo mostramos ventas de hoy si estamos viendo el mes actual
-    const isCurrentMonth = this.dashboardMonth === `${new Date().getFullYear()}-${(new Date().getMonth() + 1).toString().padStart(2, '0')}`;
+    // Cálculos principales
+    const ventaTotal = this.calculateGrossSales(monthSales);
+    const costoMercaderia = this.calculateProductCost(monthSales);
+    const utilidadBruta = this.calculateGrossProfit(monthSales);
+    const gastosFijos = this.calculateTotalExpenses();
+    const monthlyExtraList = this.monthlyExpenses.filter(e => e.month === this.dashboardMonth);
+    const totalExtra = monthlyExtraList.reduce((t, e) => t + e.amount, 0);
+    const utilidadNeta = this.calculateProfit(monthSales);
+    const puntoEquilibrio = this.calculateBreakEven(this.dashboardMonth);
+    const ventaMeta1M = this.calculateTargetRevenue(this.dashboardMonth);
+    const porcentajeEquilibrio = puntoEquilibrio > 0 ? Math.round((ventaTotal / puntoEquilibrio) * 100) : 0;
 
     container.innerHTML = `
-      <div class="section">
-        <div class="section-header" style="flex-wrap: wrap; gap: var(--spacing-md);">
-          <h2 class="section-title">📊 Resumen del Mes</h2>
+      <div class="section" style="margin-bottom: var(--spacing-lg);">
+        <div class="section-header" style="flex-wrap: wrap; gap: var(--spacing-md); margin-bottom: var(--spacing-md);">
+          <h2 class="section-title" style="font-size: 1.1rem;">📊 Resumen del Mes</h2>
           <div class="dashboard-filter" style="display: flex; align-items: center; gap: var(--spacing-sm);">
-            <select id="dashboard-month-filter" class="month-filter-select" style="padding: 8px 12px; border-radius: var(--radius-sm); background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.9rem;">
+            <select id="dashboard-month-filter" class="month-filter-select" style="padding: 4px 8px; border-radius: var(--radius-sm); background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.85rem;">
               ${availableMonths.map(m => `
                 <option value="${m.value}" ${m.value === this.dashboardMonth ? 'selected' : ''}>${m.label}</option>
               `).join('')}
             </select>
           </div>
         </div>
-        <div class="grid grid-4 mb-lg">
-          ${this.renderMetricCard('Venta Bruta', this.calculateGrossSales(monthSales), '💰', 'primary')}
-          ${this.renderMetricCard('Comisiones', this.calculateCommissions(monthSales), '💳', 'warning')}
-          ${this.renderMetricCard('Venta Real', this.calculateNetSales(monthSales), '📈', 'success')}
-          ${this.renderMetricCard('Ganancia', this.calculateProfit(monthSales), '🎯', this.calculateProfit(monthSales) >= 0 ? 'success' : 'danger')}
+        
+        <!-- Métricas Principales Compactas -->
+        <div class="grid grid-4 mb-sm" style="gap: var(--spacing-sm);">
+          ${this.renderMetricCard('💰 Venta Bruta', ventaTotal, '', 'primary')}
+          ${this.renderMetricCard('📦 Costo', costoMercaderia, '÷ 1.5', 'muted')}
+          ${this.renderMetricCard('💸 G. Fijos', gastosFijos, '', 'warning')}
+          ${this.renderMetricCard('🛠️ G. Extra', totalExtra, '', totalExtra > 0 ? 'warning' : 'muted')}
+        </div>
+
+        <div class="grid grid-2 mb-md" style="gap: var(--spacing-sm);">
+          ${this.renderMetricCard('📈 Utilidad Bruta', utilidadBruta, 'Venta - Costo', 'info')}
+          ${this.renderMetricCard('🎯 Utilidad Neta', utilidadNeta, 'Final Repartible', utilidadNeta >= 0 ? 'success' : 'danger')}
+        </div>
+        
+        <!-- Indicadores Meta / Equilibrio -->
+        <div class="grid grid-2 mb-md" style="gap: var(--spacing-sm);">
+          <div class="card" style="padding: var(--spacing-sm); background: ${ventaTotal >= puntoEquilibrio ? 'var(--success-bg)' : 'var(--danger-bg)'}; border: 1px solid ${ventaTotal >= puntoEquilibrio ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'};">
+            <div style="font-size: 0.75rem; color: var(--text-muted);">⚖️ Punto Equilibrio (Gastos Cubiertos)</div>
+            <div style="font-size: 1.1rem; font-weight: 700;">${this.formatCurrency(puntoEquilibrio)}</div>
+            <div style="font-size: 0.75rem; margin-top: 2px; color: ${ventaTotal >= puntoEquilibrio ? 'var(--success)' : 'var(--danger)'};">
+              ${ventaTotal >= puntoEquilibrio ? `✅ Alcanzado (${porcentajeEquilibrio}%)` : `⚠️ Faltan ${this.formatCurrency(puntoEquilibrio - ventaTotal)}`}
+            </div>
+          </div>
+          <div class="card" style="padding: var(--spacing-sm); border: 1px solid var(--border-color);">
+            <div style="font-size: 0.75rem; color: var(--text-muted);">🚀 Meta $1M Neto (Socio 20%)</div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: var(--info);">${this.formatCurrency(ventaMeta1M)}</div>
+            <div style="font-size: 0.75rem; margin-top: 2px;">Venta necesaria para esa utilidad</div>
+          </div>
         </div>
       </div>
-      <div class="section">
-        <div class="section-header"><h2 class="section-title">👥 Socios</h2></div>
-        <div class="grid grid-3 mb-lg">
-          ${this.renderPartnerCard('Principal', 60, dist.principal)}
-          ${this.renderPartnerCard('Menor 1', 20, dist.menor1)}
-          ${this.renderPartnerCard('Menor 2', 20, dist.menor2)}
+
+      <!-- Sección de Gastos Extra del Mes -->
+      <div class="grid grid-2" style="gap: var(--spacing-lg); align-items: start;">
+        <div class="section" style="margin-bottom: 0;">
+          <div class="section-header" style="margin-bottom: var(--spacing-sm);">
+            <h2 class="section-title" style="font-size: 1rem;">🛠️ Gastos Extra</h2>
+            <button id="add-monthly-exp-btn" class="btn btn-sm btn-secondary" style="padding: 2px 8px; font-size: 0.75rem;">+ Agregar</button>
+          </div>
+          <div class="card" style="padding: 0;">
+             <div style="max-height: 150px; overflow-y: auto;">
+              <table class="history-table" style="font-size: 0.85rem;">
+                <tbody>
+                  ${monthlyExtraList.map(e => `
+                    <tr>
+                      <td style="padding: 6px 10px;">${e.name}</td>
+                      <td class="text-right text-danger" style="padding: 6px 10px;">-${this.formatCurrency(e.amount)}</td>
+                      <td style="width: 40px; padding: 6px 10px;">
+                        <button class="btn btn-sm btn-danger delete-monthly-exp" data-id="${e.id}" style="padding: 2px 6px;">🗑️</button>
+                      </td>
+                    </tr>
+                  `).join('')}
+                  ${monthlyExtraList.length === 0 ? '<tr><td colspan="3" class="text-center text-muted" style="padding: 10px;">Sin gastos extra</td></tr>' : ''}
+                </tbody>
+              </table>
+             </div>
+          </div>
+        </div>
+
+        <div class="section" style="margin-bottom: 0;">
+          <div class="section-header" style="margin-bottom: var(--spacing-sm);">
+            <h2 class="section-title" style="font-size: 1rem;">👥 Reparto de Utilidad</h2>
+          </div>
+          <div class="grid grid-1" style="gap: var(--spacing-xs);">
+            ${this.renderPartnerCardCompact(this.config.partners.principal.name, this.config.partners.principal.percentage, dist.principal)}
+            ${this.renderPartnerCardCompact(this.config.partners.menor1.name, this.config.partners.menor1.percentage, dist.menor1)}
+            ${this.renderPartnerCardCompact(this.config.partners.menor2.name, this.config.partners.menor2.percentage, dist.menor2)}
+          </div>
         </div>
       </div>
     `;
@@ -555,11 +695,79 @@ class SalesManager {
       this.dashboardMonth = e.target.value;
       this.renderCurrentTab();
     });
+
+    document.getElementById('add-monthly-exp-btn')?.addEventListener('click', () => {
+      this.showAddMonthlyExpenseModal();
+    });
+
+    document.querySelectorAll('.delete-monthly-exp').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (confirm('¿Eliminar este gasto extra?')) {
+          await this.deleteMonthlyExpense(btn.dataset.id);
+          this.renderCurrentTab();
+        }
+      });
+    });
   }
 
-  renderMetricCard(l, v, i, t) {
-    const c = t === 'success' ? 'text-success' : t === 'danger' ? 'text-danger' : t === 'warning' ? 'text-warning' : '';
-    return `<div class="card metric-card animate-in"><span class="metric-icon">${i}</span><div class="metric-value ${c}">${this.formatCurrency(v)}</div><div class="metric-label">${l}</div></div>`;
+  showAddMonthlyExpenseModal() {
+    const content = `
+      <div class="summary-modal">
+        <h2 class="mb-lg">🛠️ Agregar Gasto Extra</h2>
+        <div class="form-group mb-md">
+          <label>Descripción</label>
+          <input type="text" id="new-exp-name" placeholder="Ej: Reparación Aire" class="registration-input" style="width: 100%;" />
+        </div>
+        <div class="form-group mb-lg">
+          <label>Monto ($)</label>
+          <input type="number" id="new-exp-amount" placeholder="0" class="registration-input" style="width: 100%;" />
+        </div>
+        <div class="flex gap-md">
+          <button class="btn btn-secondary" style="flex: 1;" onclick="salesManager.closeModal()">Cancelar</button>
+          <button class="btn btn-primary" style="flex: 1;" id="save-new-exp-btn">Guardar</button>
+        </div>
+      </div>
+    `;
+    this.showModal(content);
+
+    document.getElementById('save-new-exp-btn').addEventListener('click', async () => {
+      const name = document.getElementById('new-exp-name').value;
+      const amount = parseFloat(document.getElementById('new-exp-amount').value) || 0;
+      if (name && amount > 0) {
+        await this.addMonthlyExpense(name, amount, this.dashboardMonth);
+        this.closeModal();
+        this.renderCurrentTab();
+      } else {
+        alert('Por favor completa todos los campos con valores válidos');
+      }
+    });
+  }
+
+  renderMetricCard(label, value, subtitle, colorType) {
+    const colorClass = colorType === 'success' ? 'text-success' :
+      colorType === 'danger' ? 'text-danger' :
+        colorType === 'warning' ? 'text-warning' :
+          colorType === 'info' ? 'text-info' :
+            colorType === 'muted' ? 'text-muted' : '';
+    return `
+      <div class="card metric-card animate-in" style="padding: var(--spacing-sm);">
+        <div class="metric-label" style="font-size: 0.75rem;">${label}</div>
+        <div class="metric-value ${colorClass}" style="font-size: 1.15rem;">${this.formatCurrency(value)}</div>
+        ${subtitle ? `<div class="metric-subtitle text-muted" style="font-size: 0.7rem; margin-top: 2px;">${subtitle}</div>` : ''}
+      </div>
+    `;
+  }
+
+  renderPartnerCardCompact(n, p, a) {
+    return `
+      <div class="card animate-in" style="padding: var(--spacing-sm); display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-md); background: rgba(255,255,255,0.02);">
+        <div style="display: flex; align-items: center; gap: var(--spacing-sm);">
+           <div style="font-size: 0.8rem; font-weight: 700; color: var(--accent-primary); background: var(--warning-bg); width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%;">${p}%</div>
+           <div style="font-size: 0.85rem; font-weight: 600;">${n}</div>
+        </div>
+        <div class="partner-amount ${a >= 0 ? 'text-success' : 'text-danger'}" style="font-size: 1rem; font-weight: 700; margin: 0;">${this.formatCurrency(a)}</div>
+      </div>
+    `;
   }
 
   renderPartnerCard(n, p, a) {
