@@ -59,6 +59,8 @@ class SalesManager {
     this.config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
     this.currentTab = 'dashboard';
     this.selectedDate = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    this.dashboardMonth = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
     this.user = null; // Track current user
     this.init();
   }
@@ -480,6 +482,19 @@ class SalesManager {
     });
   }
 
+  getDashboardSales() {
+    // Uses this.dashboardMonth instead of current month
+    const [year, month] = this.dashboardMonth.split('-');
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 0);
+    return this.sales.filter(s => {
+      const d = new Date(s.date);
+      // Ajuste para la zona horaria local o comparación string directa
+      // Como s.date es YYYY-MM-DD y estamos filtrando por mes, podemos usar startsWith
+      return s.date.startsWith(this.dashboardMonth);
+    });
+  }
+
   getTodaySales() {
     const t = new Date(); t.setHours(0, 0, 0, 0);
     const tm = new Date(t); tm.setDate(t.getDate() + 1);
@@ -494,12 +509,30 @@ class SalesManager {
   }
 
   renderDashboard(container) {
-    const monthSales = this.getCurrentMonthSales();
+    const monthSales = this.getDashboardSales();
     const todaySales = this.getTodaySales();
     const dist = this.calculatePartnerDistribution(monthSales);
+
+    // Get month name for display
+    const [year, month] = this.dashboardMonth.split('-');
+    const displayMonth = `${MONTHS[parseInt(month) - 1]} ${year}`;
+    const availableMonths = this.getAvailableMonths();
+
+    // Solo mostramos ventas de hoy si estamos viendo el mes actual
+    const isCurrentMonth = this.dashboardMonth === `${new Date().getFullYear()}-${(new Date().getMonth() + 1).toString().padStart(2, '0')}`;
+
     container.innerHTML = `
       <div class="section">
-        <div class="section-header"><h2 class="section-title">📊 Resumen del Mes</h2><span class="badge badge-info">${MONTHS[new Date().getMonth()]} ${new Date().getFullYear()}</span></div>
+        <div class="section-header" style="flex-wrap: wrap; gap: var(--spacing-md);">
+          <h2 class="section-title">📊 Resumen del Mes</h2>
+          <div class="dashboard-filter" style="display: flex; align-items: center; gap: var(--spacing-sm);">
+            <select id="dashboard-month-filter" class="month-filter-select" style="padding: 8px 12px; border-radius: var(--radius-sm); background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.9rem;">
+              ${availableMonths.map(m => `
+                <option value="${m.value}" ${m.value === this.dashboardMonth ? 'selected' : ''}>${m.label}</option>
+              `).join('')}
+            </select>
+          </div>
+        </div>
         <div class="grid grid-4 mb-lg">
           ${this.renderMetricCard('Venta Bruta', this.calculateGrossSales(monthSales), '💰', 'primary')}
           ${this.renderMetricCard('Comisiones', this.calculateCommissions(monthSales), '💳', 'warning')}
@@ -516,6 +549,12 @@ class SalesManager {
         </div>
       </div>
     `;
+
+    // Listeners
+    document.getElementById('dashboard-month-filter')?.addEventListener('change', (e) => {
+      this.dashboardMonth = e.target.value;
+      this.renderCurrentTab();
+    });
   }
 
   renderMetricCard(l, v, i, t) {
