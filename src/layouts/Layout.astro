@@ -1,0 +1,161 @@
+---
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Sistema de gestión de ventas para MegaMuebles" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <header class="header">
+      <div class="header-content container">
+        <div class="logo">
+          <span class="logo-icon">🛋️</span>
+          <span class="logo-text">MegaMuebles</span>
+          <span class="logo-badge">Ventas</span>
+        </div>
+        <nav class="nav-tabs" id="main-nav" style="display: none;">
+          <button class="nav-tab active" data-tab="dashboard">📊 Dashboard</button>
+          <button class="nav-tab" data-tab="registro">➕ Registrar Venta</button>
+          <button class="nav-tab" data-tab="historial">📋 Historial</button>
+          <button class="nav-tab" data-tab="mensual">📅 Mensual</button>
+          <button class="nav-tab" data-tab="config">⚙️ Configuración</button>
+        </nav>
+        <div id="user-info" style="display: none; align-items: center; gap: var(--spacing-md);">
+          <span id="user-display" class="text-muted" style="font-size: 0.8rem;"></span>
+          <button id="logout-btn" class="btn btn-sm btn-secondary" style="padding: 4px 12px; font-size: 0.75rem;">Cerrar Sesión</button>
+        </div>
+      </div>
+    </header>
+    
+    <main class="main container">
+      <slot />
+    </main>
+    
+    <footer class="footer">
+      <div class="container">
+        <p class="text-muted text-center">© 2026 MegaMuebles - Sistema de Gestión de Ventas</p>
+      </div>
+    </footer>
+  </body>
+</html>
+
+<style is:global>
+  @import '../styles/global.css';
+  @import '../styles/ui-refinements.css';
+  
+  .header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  
+  .header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: var(--spacing-md);
+    padding-bottom: var(--spacing-md);
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+  }
+  
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+  
+  .logo-icon {
+    font-size: 1.75rem;
+  }
+  
+  .logo-text {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  
+  .logo-badge {
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    color: #000;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    text-transform: uppercase;
+  }
+  
+  .nav-tabs {
+    display: flex;
+    gap: var(--spacing-xs);
+    flex-wrap: wrap;
+  }
+  
+  .nav-tab {
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .nav-tab:hover {
+    color: var(--text-secondary);
+    background: var(--bg-card);
+  }
+  
+  .nav-tab.active {
+    color: var(--accent-primary);
+    background: var(--bg-card);
+  }
+  
+  .main {
+    padding-top: var(--spacing-xl);
+    padding-bottom: var(--spacing-xl);
+    min-height: calc(100vh - 180px);
+  }
+  
+  .footer {
+    border-top: 1px solid var(--border-color);
+    padding: var(--spacing-lg) 0;
+  }
+  
+  @media (max-width: 768px) {
+    .header-content {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    
+    .logo {
+      justify-content: center;
+    }
+    
+    .nav-tabs {
+      justify-content: center;
+    }
+    
+    .nav-tab {
+      font-size: 0.75rem;
+      padding: var(--spacing-xs) var(--spacing-sm);
+    }
+  }
+</style>
