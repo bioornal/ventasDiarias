@@ -399,28 +399,26 @@ class SalesManager {
           <span class="badge badge-info">${monthlyData.length} Meses</span>
         </div>
         
-        <div class="card" style="padding:0; overflow-x:auto;">
-          <table class="history-table">
-            <thead>
-              <tr>
-                <th style="width: 40%;">Mes / Año</th>
-                <th class="text-right">Venta Bruta</th>
-                <th class="text-right">Venta Real</th>
-                <th class="text-right">Ventas</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${monthlyData.map(([key, data]) => `
-                <tr>
-                  <td><strong>${data.name}</strong></td>
-                  <td class="text-right"><strong>${this.formatCurrency(data.gross)}</strong></td>
-                  <td class="text-right text-success" style="font-weight:600;">${this.formatCurrency(data.net)}</td>
-                  <td class="text-right text-muted">${data.count}</td>
-                </tr>
-              `).join('')}
-              ${monthlyData.length === 0 ? '<tr><td colspan="4" class="text-center text-muted">No hay datos suficientes aún</td></tr>' : ''}
-            </tbody>
-          </table>
+        <div class="monthly-cards">
+          ${monthlyData.map(([key, data]) => `
+            <div class="card monthly-card">
+              <div class="monthly-card-header">
+                <span class="monthly-month">${data.name}</span>
+                <span class="badge badge-info">${data.count} ventas</span>
+              </div>
+              <div class="monthly-card-body">
+                <div class="monthly-metric">
+                  <span class="monthly-label">Venta Bruta</span>
+                  <span class="monthly-value">${this.formatCurrency(data.gross)}</span>
+                </div>
+                <div class="monthly-metric">
+                  <span class="monthly-label">Venta Real</span>
+                  <span class="monthly-value text-success">${this.formatCurrency(data.net)}</span>
+                </div>
+              </div>
+            </div>
+          `).join('')}
+          ${monthlyData.length === 0 ? '<div class="card text-center text-muted" style="padding: var(--spacing-xl);">No hay datos suficientes aún</div>' : ''}
         </div>
       </div>
     `;
@@ -659,13 +657,38 @@ class SalesManager {
   }
 
   renderHistory(container) {
-    const grouped = this.groupSalesByDate();
+    // Initialize historyMonth to current month if not set
+    if (!this.historyMonth) {
+      const now = new Date();
+      this.historyMonth = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+    }
+
+    // Get available months from sales data
+    const availableMonths = this.getAvailableMonths();
+
+    // Filter sales by selected month
+    const filteredSales = this.sales.filter(s => s.date.startsWith(this.historyMonth));
+
+    // Group filtered sales by date
+    const grouped = this.groupSalesByDateFiltered(filteredSales);
+
+    // Get month name for display
+    const [year, month] = this.historyMonth.split('-');
+    const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    const displayMonth = `${monthNames[parseInt(month) - 1]} ${year}`;
 
     container.innerHTML = `
       <div class="section">
-        <div class="section-header">
+        <div class="section-header" style="flex-wrap: wrap; gap: var(--spacing-md);">
           <h2 class="section-title">📋 Historial</h2>
-          <span class="badge badge-info">${this.sales.length} registros</span>
+          <div class="history-filter" style="display: flex; align-items: center; gap: var(--spacing-sm);">
+            <select id="history-month-filter" class="month-filter-select" style="padding: 8px 12px; border-radius: var(--radius-sm); background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.9rem;">
+              ${availableMonths.map(m => `
+                <option value="${m.value}" ${m.value === this.historyMonth ? 'selected' : ''}>${m.label}</option>
+              `).join('')}
+            </select>
+            <span class="badge badge-info">${filteredSales.length} ventas</span>
+          </div>
         </div>
         
         <div class="history-container">
@@ -675,7 +698,7 @@ class SalesManager {
                 <span class="day-date">📅 ${new Date(date + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
                 <span class="day-total">Total: <strong>${this.formatCurrency(data.total)}</strong></span>
               </div>
-              <div class="card" style="padding:0; overflow-x:auto;">
+              <div class="card" style="padding:0;">
                 <table class="history-table">
                   <thead>
                     <tr>
@@ -693,16 +716,58 @@ class SalesManager {
               </div>
             </div>
           `).join('')}
-          ${this.sales.length === 0 ? '<div class="card text-center text-muted">No hay registros aún</div>' : ''}
+          ${filteredSales.length === 0 ? '<div class="card text-center text-muted" style="padding: var(--spacing-xl);">No hay ventas en este mes</div>' : ''}
         </div>
       </div>
     `;
 
+    // Setup month filter listener
+    document.getElementById('history-month-filter')?.addEventListener('change', (e) => {
+      this.historyMonth = e.target.value;
+      this.renderCurrentTab();
+    });
+
     document.querySelectorAll('.delete-sale').forEach(b => b.addEventListener('click', async () => {
       if (confirm('¿Seguro que deseas eliminar esta venta?')) {
-        if (await this.deleteSale(b.dataset.id)) this.renderHistory(container);
+        await this.deleteSale(b.dataset.id);
       }
     }));
+  }
+
+  getAvailableMonths() {
+    const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    const months = new Set();
+
+    // Always include current month
+    const now = new Date();
+    months.add(`${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`);
+
+    // Add months from sales
+    this.sales.forEach(s => {
+      const [year, month] = s.date.split('-');
+      months.add(`${year}-${month}`);
+    });
+
+    // Convert to array and sort descending
+    return Array.from(months)
+      .sort((a, b) => b.localeCompare(a))
+      .map(m => {
+        const [year, month] = m.split('-');
+        return {
+          value: m,
+          label: `${monthNames[parseInt(month) - 1]} ${year}`
+        };
+      });
+  }
+
+  groupSalesByDateFiltered(sales) {
+    const groups = {};
+    sales.forEach(s => {
+      if (!groups[s.date]) groups[s.date] = { sales: [], total: 0 };
+      groups[s.date].sales.push(s);
+      groups[s.date].total += this.getSaleTotals(s).gross;
+    });
+    return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
   }
 
   renderSaleRow(s) {

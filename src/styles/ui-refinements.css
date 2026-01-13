@@ -135,31 +135,57 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         gap: var(--spacing-md);
     }
 
+    .day-group {
+        width: 100%;
+        overflow: visible;
+    }
+
+    .history-table {
+        width: 100%;
+        min-width: unset;
+        table-layout: fixed;
+    }
+
     .day-header {
         padding: var(--spacing-sm) var(--spacing-md);
-        font-size: 0.9rem;
+        font-size: 0.85rem;
+        display: flex;
         flex-direction: column;
         align-items: flex-start;
-        gap: 4px;
+        gap: 2px;
     }
 
     .day-total {
-        font-size: 1.1rem;
+        font-size: 1rem;
     }
 
     .history-table th,
     .history-table td {
-        padding: 10px 8px;
-        font-size: 0.85rem;
+        padding: 6px 4px;
+        font-size: 0.7rem;
+        word-break: break-word;
+        overflow-wrap: break-word;
     }
 
-    /* Hide less important columns on mobile if needed or use scroll */
+    /* Proportional column widths for 4 columns */
+    .history-table th:nth-child(1),
+    .history-table td:nth-child(1) {
+        width: 12%;
+    }
+
     .history-table th:nth-child(2),
     .history-table td:nth-child(2) {
-        max-width: 150px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        width: 38%;
+    }
+
+    .history-table th:nth-child(3),
+    .history-table td:nth-child(3) {
+        width: 25%;
+    }
+
+    .history-table th:nth-child(4),
+    .history-table td:nth-child(4) {
+        width: 25%;
     }
 }
 
@@ -243,4 +269,66 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .date-select-group select {
     width: 100%;
+}
+
+/* --- Monthly Summary Cards --- */
+.monthly-cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.monthly-card {
+    padding: var(--spacing-md) !important;
+}
+
+.monthly-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.monthly-month {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.monthly-card-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-md);
+}
+
+.monthly-metric {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.monthly-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.monthly-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    color: var(--text-primary);
+}
+
+@media (max-width: 480px) {
+    .monthly-card-body {
+        grid-template-columns: 1fr;
+    }
+
+    .monthly-value {
+        font-size: 1rem;
+    }
 }
