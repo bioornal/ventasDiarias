@@ -332,3 +332,50 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         font-size: 1rem;
     }
 }
+
+/* --- Form Actions & Buttons --- */
+.form-actions {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin-top: var(--spacing-xl);
+}
+
+.register-btn {
+    width: 100%;
+    max-width: 400px;
+    height: 56px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: linear-gradient(135deg, var(--accent-primary), #6366f1);
+    color: white;
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+}
+
+.register-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+    filter: brightness(1.1);
+}
+
+.register-btn:active {
+    transform: translateY(1px) scale(0.98);
+}
+
+@media (max-width: 768px) {
+    .register-btn {
+        height: 60px;
+        /* Larger touch target for mobile */
+        font-size: 1.2rem;
+    }
+}

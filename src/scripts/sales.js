@@ -558,6 +558,12 @@ class SalesManager {
                 <div class="input-group"><span class="input-prefix">U$D</span><input type="number" id="amount-usd-efectivo" min="0" step="0.01" placeholder="0" class="registration-input" /></div>
               </div>
             </div>
+
+            <div class="form-actions mt-xl">
+              <button type="submit" class="btn btn-primary btn-lg register-btn" id="register-sale-btn">
+                <span>🚀 Registrar Venta</span>
+              </button>
+            </div>
           </form>
         </div>
       </div>
@@ -577,6 +583,15 @@ class SalesManager {
 
     dateTrigger.addEventListener('click', (e) => { if (e.target !== dateInput) openPicker(); });
     dateInput.addEventListener('change', (e) => { this.selectedDate = e.target.value; this.renderCurrentTab(); });
+
+    // Ensure Enter key works on all inputs
+    form.querySelectorAll('input').forEach(input => {
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          // Native form submission will handle it because of the submit button
+        }
+      });
+    });
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
