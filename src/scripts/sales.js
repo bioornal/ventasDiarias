@@ -597,6 +597,8 @@ class SalesManager {
 
     // Cálculos principales
     const ventaTotal = this.calculateGrossSales(monthSales);
+    const ventaReal = this.calculateNetSales(monthSales); // Venta sin comisiones de tarjetas
+    const totalComisiones = this.calculateCommissions(monthSales);
     const costoMercaderia = this.calculateProductCost(monthSales);
     const utilidadBruta = this.calculateGrossProfit(monthSales);
     const gastosFijos = this.calculateTotalExpenses();
@@ -621,8 +623,12 @@ class SalesManager {
         </div>
         
         <!-- Métricas Principales Compactas -->
-        <div class="grid grid-4 mb-sm" style="gap: var(--spacing-sm);">
+        <div class="grid grid-2 mb-sm" style="gap: var(--spacing-sm);">
           ${this.renderMetricCard('💰 Venta Bruta', ventaTotal, '', 'primary')}
+          ${this.renderMetricCard('💵 Venta Real', ventaReal, `- ${this.formatCurrency(totalComisiones)} comisiones`, 'success')}
+        </div>
+        <div class="grid grid-4 mb-sm" style="gap: var(--spacing-sm);">
+          ${this.renderMetricCard('💳 Comisiones', totalComisiones, 'Tarjetas/Métodos', 'danger')}
           ${this.renderMetricCard('📦 Costo', costoMercaderia, '÷ 1.5', 'muted')}
           ${this.renderMetricCard('💸 G. Fijos', gastosFijos, '', 'warning')}
           ${this.renderMetricCard('🛠️ G. Extra', totalExtra, '', totalExtra > 0 ? 'warning' : 'muted')}
