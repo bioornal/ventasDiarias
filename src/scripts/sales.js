@@ -63,6 +63,7 @@ class SalesManager {
     const now = new Date();
     this.dashboardMonth = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
     this.user = null; // Track current user
+    this.pendingEntries = []; // Queue for multiple entries
     this.init();
   }
 
@@ -786,38 +787,111 @@ class SalesManager {
   }
 
   renderSalesForm(container) {
+    // Definimos todos los métodos incluyendo USD
+    const allMethods = [
+      ...Object.entries(PAYMENT_LABELS).map(([k, l]) => ({ key: k, label: l, isUSD: false, prefix: '$' })),
+      { key: 'usd_efectivo', label: 'Efectivo USD', isUSD: true, prefix: 'U$D' }
+    ];
+
     container.innerHTML = `
-      <div class="section">
-        <div class="card minimalist-registration">
-          <form id="sales-form">
-            <div class="form-group mb-lg">
-              <div class="date-trigger" id="date-picker-trigger">
+      <div class="section animate-in">
+        <div class="sale-reg-layout">
+          <!-- Columna izquierda: campos de entrada -->
+          <div class="card minimalist-registration sale-inputs-col">
+            <div class="section-header mb-md" style="border-bottom: 1px solid var(--border-color); padding-bottom: var(--spacing-sm);">
+              <h2 class="section-title" style="font-size: 1rem;">📝 Nueva Venta</h2>
+              <div class="date-trigger" id="date-picker-trigger" style="padding: 4px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
                 <span>📅</span>
-                <input type="date" id="sale-date" value="${this.selectedDate}" required style="width: 100%;" />
-              </div>
-            </div>
-            
-            <div class="form-grid">
-              ${Object.entries(PAYMENT_LABELS).map(([k, l]) => `
-                <div class="form-group">
-                  <label>${l} ${this.config.commissions[k] > 0 ? `<span class="badge badge-warning">${this.config.commissions[k]}%</span>` : ''}</label>
-                  <div class="input-group"><span class="input-prefix">$</span><input type="number" id="amount-${k}" min="0" step="1" placeholder="0" class="registration-input" /></div>
-                </div>
-              `).join('')}
-            </div>
-            <div class="form-grid" style="margin-top:20px; border-top: 1px dashed var(--border-color); padding-top: 20px;">
-              <div class="form-group">
-                <label>Efectivo USD</label>
-                <div class="input-group"><span class="input-prefix">U$D</span><input type="number" id="amount-usd-efectivo" min="0" step="0.01" placeholder="0" class="registration-input" /></div>
+                <input type="date" id="sale-date" value="${this.selectedDate}" required
+                  style="background: transparent; border: none; color: var(--text-primary); cursor: pointer; font-size: 0.9rem;" />
               </div>
             </div>
 
-            <div class="form-actions mt-xl">
-              <button type="submit" class="btn btn-primary btn-lg register-btn" id="register-sale-btn">
-                <span>🚀 Registrar Venta</span>
+            <div class="payment-fields-grid">
+              ${allMethods.map(m => `
+                <div class="payment-row" data-method="${m.key}">
+                  <label class="payment-row-label">
+                    ${m.label}
+                    ${!m.isUSD && this.config.commissions[m.key] > 0
+        ? `<span class="badge badge-warning" style="font-size:0.65rem;">${this.config.commissions[m.key]}%</span>`
+        : ''}
+                  </label>
+                  <div class="payment-row-input">
+                    <div class="input-group" style="flex:1;">
+                      <span class="input-prefix">${m.prefix}</span>
+                      <input
+                        type="number"
+                        class="registration-input payment-amount-input"
+                        id="field-${m.key}"
+                        min="0" step="${m.isUSD ? '0.01' : '1'}"
+                        placeholder="0"
+                        data-method="${m.key}"
+                        data-label="${m.label}"
+                        data-isusd="${m.isUSD}"
+                      />
+                    </div>
+                    <button type="button"
+                      class="btn btn-add-payment"
+                      data-method="${m.key}"
+                      data-label="${m.label}"
+                      data-isusd="${m.isUSD}"
+                      title="Añadir ${m.label}">
+                      ➕
+                    </button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Columna derecha: lista acumulada -->
+          <div class="sale-pending-col">
+            <div class="card" style="padding: var(--spacing-md); height: 100%;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-sm); border-bottom: 1px solid var(--border-color); padding-bottom: var(--spacing-sm);">
+                <h3 style="font-size: 0.9rem; margin: 0; color: var(--text-muted);">Lista de ventas</h3>
+                <span class="badge ${this.pendingEntries.length > 0 ? 'badge-info' : ''}" style="font-size: 0.75rem;">
+                  ${this.pendingEntries.length} ítem${this.pendingEntries.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+
+              <div id="pending-entries-list" style="min-height: 120px;">
+                ${this.pendingEntries.length === 0
+        ? `<div class="pending-empty-state">
+                      <span style="font-size: 2rem; opacity: 0.3;">📋</span>
+                      <p style="font-size: 0.8rem; color: var(--text-muted); margin: 4px 0 0;">
+                        Ingresá un monto y presioná ➕
+                      </p>
+                    </div>`
+        : this.pendingEntries.map((entry, index) => `
+                    <div class="pending-entry-item animate-in">
+                      <div class="pending-entry-info">
+                        <span class="pending-entry-label">${entry.label}</span>
+                        <span class="pending-entry-amount ${entry.isUSD ? 'text-info' : 'text-success'}">
+                          ${entry.isUSD ? 'U$D ' + entry.amount : this.formatCurrency(entry.amount)}
+                        </span>
+                      </div>
+                      <button class="btn btn-sm btn-danger remove-pending-btn" data-index="${index}" style="padding: 3px 7px; flex-shrink: 0;">✕</button>
+                    </div>
+                  `).join('')
+      }
+              </div>
+
+              ${this.pendingEntries.length > 0 ? `
+                <div style="margin-top: auto; border-top: 1px solid var(--border-color); padding-top: var(--spacing-sm);">
+                  <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; margin-bottom: var(--spacing-xs);">
+                    <span style="color: var(--text-muted);">Subtotal del día</span>
+                    <span style="font-weight: 700; color: var(--accent-primary); font-family: var(--font-mono);">${this.calculatePendingTotal()}</span>
+                  </div>
+                </div>
+              ` : ''}
+
+              <button type="button" class="btn btn-primary register-btn" id="register-all-btn"
+                ${this.pendingEntries.length === 0 ? 'disabled' : ''}
+                style="width: 100%; margin-top: var(--spacing-md); opacity: ${this.pendingEntries.length === 0 ? '0.45' : '1'}; font-size: 1rem; height: 52px;">
+                🚀 Registrar ${this.pendingEntries.length > 0 ? `(${this.pendingEntries.length})` : ''}
               </button>
             </div>
-          </form>
+          </div>
         </div>
       </div>
     `;
@@ -825,9 +899,9 @@ class SalesManager {
   }
 
   setupSalesForm() {
-    const form = document.getElementById('sales-form');
     const dateInput = document.getElementById('sale-date');
     const dateTrigger = document.getElementById('date-picker-trigger');
+    const registerAllBtn = document.getElementById('register-all-btn');
 
     const openPicker = () => {
       try { if (typeof dateInput.showPicker === 'function') dateInput.showPicker(); else dateInput.focus(); }
@@ -835,39 +909,154 @@ class SalesManager {
     };
 
     dateTrigger.addEventListener('click', (e) => { if (e.target !== dateInput) openPicker(); });
-    dateInput.addEventListener('change', (e) => { this.selectedDate = e.target.value; this.renderCurrentTab(); });
+    dateInput.addEventListener('change', (e) => {
+      this.selectedDate = e.target.value;
+      this.renderCurrentTab();
+    });
 
-    // Ensure Enter key works on all inputs
-    form.querySelectorAll('input').forEach(input => {
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          // Native form submission will handle it because of the submit button
+    // Lightweight DOM refresh for the pending list (preserves focus on inputs)
+    const refreshPendingList = () => {
+      const listEl = document.getElementById('pending-entries-list');
+      const btn = document.getElementById('register-all-btn');
+      if (!listEl) return;
+
+      if (this.pendingEntries.length === 0) {
+        listEl.innerHTML = `
+          <div class="pending-empty-state">
+            <span style="font-size: 2rem; opacity: 0.3;">📋</span>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin: 4px 0 0;">Ingresá un monto y presioná ➕</p>
+          </div>`;
+        const sub = document.getElementById('pending-subtotal-block');
+        if (sub) sub.remove();
+      } else {
+        listEl.innerHTML = this.pendingEntries.map((entry, index) => `
+          <div class="pending-entry-item animate-in">
+            <div class="pending-entry-info">
+              <span class="pending-entry-label">${entry.label}</span>
+              <span class="pending-entry-amount ${entry.isUSD ? 'text-info' : 'text-success'}">
+                ${entry.isUSD ? 'U$D ' + entry.amount : this.formatCurrency(entry.amount)}
+              </span>
+            </div>
+            <button class="btn btn-sm btn-danger remove-pending-btn" data-index="${index}" style="padding: 3px 7px; flex-shrink: 0;">✕</button>
+          </div>
+        `).join('');
+
+        // Subtotal block
+        let sub = document.getElementById('pending-subtotal-block');
+        if (!sub) {
+          sub = document.createElement('div');
+          sub.id = 'pending-subtotal-block';
+          sub.style.cssText = 'border-top: 1px solid var(--border-color); padding-top: var(--spacing-sm); margin-top: var(--spacing-sm);';
+          listEl.parentNode.insertBefore(sub, btn);
         }
+        sub.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; margin-bottom: var(--spacing-xs);">
+            <span style="color: var(--text-muted);">Subtotal del día</span>
+            <span style="font-weight: 700; color: var(--accent-primary); font-family: var(--font-mono);">${this.calculatePendingTotal()}</span>
+          </div>`;
+
+        listEl.querySelectorAll('.remove-pending-btn').forEach(b => {
+          b.addEventListener('click', () => {
+            this.pendingEntries.splice(parseInt(b.dataset.index), 1);
+            refreshPendingList();
+            updateBtn();
+          });
+        });
+      }
+
+      // Badge
+      const badge = document.querySelector('.sale-pending-col .badge');
+      if (badge) {
+        badge.textContent = `${this.pendingEntries.length} ítem${this.pendingEntries.length !== 1 ? 's' : ''}`;
+        badge.className = `badge ${this.pendingEntries.length > 0 ? 'badge-info' : ''}`;
+      }
+    };
+
+    const updateBtn = () => {
+      const b = document.getElementById('register-all-btn');
+      if (!b) return;
+      const n = this.pendingEntries.length;
+      b.disabled = n === 0;
+      b.style.opacity = n === 0 ? '0.45' : '1';
+      b.innerHTML = `🚀 Registrar ${n > 0 ? `(${n})` : ''}`;
+    };
+
+    // Per-field add buttons
+    document.querySelectorAll('.btn-add-payment').forEach(btn => {
+      const method = btn.dataset.method;
+      const label = btn.dataset.label;
+      const isUSD = btn.dataset.isusd === 'true';
+      const input = document.getElementById(`field-${method}`);
+
+      const addEntry = () => {
+        const amount = parseFloat(input?.value) || 0;
+        if (amount <= 0) return;
+        this.pendingEntries.push({ method: isUSD ? 'efectivo' : method, isUSD, amount, label });
+        input.value = '';
+        input.focus();
+        refreshPendingList();
+        updateBtn();
+      };
+
+      btn.addEventListener('click', addEntry);
+      input?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); addEntry(); }
       });
     });
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const amounts = {}, amountsUSD = {};
-      Object.keys(PAYMENT_LABELS).forEach(k => {
-        const v = parseFloat(document.getElementById(`amount-${k}`).value) || 0;
-        if (v > 0) amounts[k] = v;
+    // Initial remove listeners
+    document.querySelectorAll('.remove-pending-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.pendingEntries.splice(parseInt(btn.dataset.index), 1);
+        refreshPendingList();
+        updateBtn();
       });
+    });
 
-      const vUsd = parseFloat(document.getElementById('amount-usd-efectivo').value) || 0;
-      if (vUsd > 0) amountsUSD.efectivo = vUsd;
+    registerAllBtn?.addEventListener('click', async () => {
+      if (this.pendingEntries.length === 0) return;
+      registerAllBtn.disabled = true;
+      registerAllBtn.textContent = '⏱️ Registrando...';
 
-      if (Object.keys(amounts).length || Object.keys(amountsUSD).length) {
-        const newSale = await this.addSale({
-          date: this.selectedDate,
-          amounts, amountsUSD, notes: '' // Notas eliminadas en UI pero mantenemos el campo vacío
-        });
-        if (newSale) {
-          this.showSummaryModal(newSale);
-          form.querySelectorAll('input:not(#sale-date)').forEach(i => i.value = '');
-        }
+      let successCount = 0;
+      for (const entry of this.pendingEntries) {
+        const amounts = {}, amountsUSD = {};
+        if (entry.isUSD) { amountsUSD[entry.method] = entry.amount; }
+        else { amounts[entry.method] = entry.amount; }
+        const newSale = await this.addSale({ date: this.selectedDate, amounts, amountsUSD, notes: '' });
+        if (newSale) successCount++;
+      }
+
+      if (successCount > 0) {
+        this.pendingEntries = [];
+        registerAllBtn.style.background = 'var(--success)';
+        registerAllBtn.textContent = `✅ ${successCount} registrada(s)`;
+        setTimeout(() => this.renderCurrentTab(), 1200);
+      } else {
+        alert('❌ Error al registrar las ventas.');
+        registerAllBtn.disabled = false;
+        registerAllBtn.innerHTML = '🚀 Registrar';
       }
     });
+  }
+
+  calculatePendingTotal() {
+    let totalARS = 0;
+    // Sumar ventas ya existentes en el día si quisiéramos mostrar el acumulado real
+    // Pero por ahora mostremos el subtotal de lo que se va a agregar + lo ya existente
+    const existingDaySales = this.sales.filter(s => s.date === this.selectedDate);
+    const existingTotal = this.calculateGrossSales(existingDaySales);
+
+    let pendingTotalARS = 0;
+    this.pendingEntries.forEach(entry => {
+      if (entry.isUSD) {
+        pendingTotalARS += entry.amount * this.config.usdRate;
+      } else {
+        pendingTotalARS += entry.amount;
+      }
+    });
+
+    return this.formatCurrency(existingTotal + pendingTotalARS);
   }
 
   closeModal() {
