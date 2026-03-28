@@ -27,11 +27,11 @@ const { title } = Astro.props;
           <span class="logo-badge">Ventas</span>
         </div>
         <nav class="nav-tabs" id="main-nav" style="display: none;">
-          <button class="nav-tab active" data-tab="dashboard">📊 Dashboard</button>
-          <button class="nav-tab" data-tab="registro">➕ Registrar Venta</button>
-          <button class="nav-tab" data-tab="historial">📋 Historial</button>
-          <button class="nav-tab" data-tab="mensual">📅 Mensual</button>
-          <button class="nav-tab" data-tab="config">⚙️ Configuración</button>
+          <button class="nav-tab active" data-tab="dashboard"><span class="nav-icon">📊</span><span class="nav-label">Dashboard</span></button>
+          <button class="nav-tab" data-tab="registro"><span class="nav-icon">➕</span><span class="nav-label">Registro</span></button>
+          <button class="nav-tab" data-tab="historial"><span class="nav-icon">📋</span><span class="nav-label">Historial</span></button>
+          <button class="nav-tab" data-tab="mensual"><span class="nav-icon">📅</span><span class="nav-label">Mensual</span></button>
+          <button class="nav-tab" data-tab="config"><span class="nav-icon">⚙️</span><span class="nav-label">Config</span></button>
         </nav>
         <div id="user-info" style="display: none; align-items: center; gap: var(--spacing-md);">
           <span id="user-display" class="text-muted" style="font-size: 0.8rem;"></span>
@@ -107,6 +107,10 @@ const { title } = Astro.props;
   }
   
   .nav-tab {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
     padding: var(--spacing-sm) var(--spacing-md);
     font-size: 0.875rem;
     font-weight: 500;
@@ -117,6 +121,9 @@ const { title } = Astro.props;
     cursor: pointer;
     transition: all 0.2s ease;
   }
+
+  .nav-icon { font-size: 1.1rem; line-height: 1; }
+  .nav-label { font-size: 0.875rem; }
   
   .nav-tab:hover {
     color: var(--text-secondary);
@@ -165,24 +172,15 @@ const { title } = Astro.props;
     
     .nav-tab {
       flex: 1;
-      font-size: 1.25rem;
-      padding: var(--spacing-sm) var(--spacing-xs);
+      flex-direction: column;
+      gap: 3px;
+      padding: 6px 4px;
       text-align: center;
       min-width: 0;
     }
 
-    /* Hide text, show only emoji on mobile */
-    .nav-tab {
-      font-size: 0;
-    }
-    .nav-tab::before {
-      font-size: 1.4rem;
-    }
-    .nav-tab[data-tab="dashboard"]::before { content: "📊"; font-size: 1.4rem; }
-    .nav-tab[data-tab="registro"]::before { content: "➕"; font-size: 1.4rem; }
-    .nav-tab[data-tab="historial"]::before { content: "📋"; font-size: 1.4rem; }
-    .nav-tab[data-tab="mensual"]::before { content: "📅"; font-size: 1.4rem; }
-    .nav-tab[data-tab="config"]::before { content: "⚙️"; font-size: 1.4rem; }
+    .nav-icon { font-size: 1.3rem; }
+    .nav-label { font-size: 0.6rem; line-height: 1; letter-spacing: 0; }
 
     #user-info {
       width: 100%;

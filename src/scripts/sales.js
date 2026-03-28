@@ -61,7 +61,8 @@ class SalesManager {
     this.currentTab = 'dashboard';
     this.selectedDate = new Date().toISOString().split('T')[0];
     const now = new Date();
-    this.dashboardMonth = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+    const currentMonth = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+    this.dashboardMonth = localStorage.getItem('megamuebles_dashboard_month') || currentMonth;
     this.user = null; // Track current user
     this.pendingEntries = []; // Queue for multiple entries
     this.init();
@@ -192,9 +193,8 @@ class SalesManager {
         if (e.target === overlay) this.closeModal();
       });
 
-      // Cerrar con tecla Enter
       window.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && overlay.classList.contains('active')) {
+        if (e.key === 'Escape' && overlay.classList.contains('active')) {
           this.closeModal();
         }
       });
@@ -211,6 +211,25 @@ class SalesManager {
   closeModal() {
     const overlay = document.querySelector('.modal-overlay');
     overlay.classList.remove('active');
+  }
+
+  showConfirmModal(message, onConfirm, confirmLabel = 'Eliminar', confirmClass = 'btn-danger') {
+    this.showModal(`
+      <div style="text-align: center; padding: var(--spacing-sm) 0;">
+        <p style="font-size: 1rem; color: var(--text-primary); margin-bottom: var(--spacing-xl);">${message}</p>
+        <div style="display: flex; gap: var(--spacing-md); justify-content: center;">
+          <button id="confirm-cancel-btn" class="btn btn-secondary">Cancelar</button>
+          <button id="confirm-ok-btn" class="btn ${confirmClass}">${confirmLabel}</button>
+        </div>
+      </div>
+    `);
+    document.getElementById('confirm-ok-btn').addEventListener('click', () => {
+      this.closeModal();
+      onConfirm();
+    });
+    document.getElementById('confirm-cancel-btn').addEventListener('click', () => {
+      this.closeModal();
+    });
   }
 
   async loadAll() {
@@ -356,7 +375,7 @@ class SalesManager {
     const migrated = localStorage.getItem('megamuebles_migrated');
     if (migrated || !localSales) return;
 
-    if (confirm('Deseas subir tus datos locales a la nube?')) {
+    if (confirm('¿Deseas subir tus datos locales a la nube?')) {
       const parsedSales = JSON.parse(localSales);
       for (const sale of parsedSales) {
         await supabase.from('sales').insert({
@@ -459,7 +478,12 @@ class SalesManager {
               </div>
             </div>
           `).join('')}
-          ${monthlyData.length === 0 ? '<div class="card text-center text-muted" style="padding: var(--spacing-xl);">No hay datos suficientes aún</div>' : ''}
+          ${monthlyData.length === 0 ? `
+            <div class="card text-center" style="padding: var(--spacing-xl) var(--spacing-lg);">
+              <div style="font-size: 2.5rem; margin-bottom: var(--spacing-md); opacity: 0.35;">📅</div>
+              <p style="color: var(--text-primary); font-weight: 600; margin-bottom: 6px;">Sin ventas registradas</p>
+              <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">Las ventas que registres aparecerán aquí agrupadas por mes.</p>
+            </div>` : ''}
         </div>
       </div>
     `;
@@ -700,6 +724,7 @@ class SalesManager {
     // Listeners
     document.getElementById('dashboard-month-filter')?.addEventListener('change', (e) => {
       this.dashboardMonth = e.target.value;
+      localStorage.setItem('megamuebles_dashboard_month', this.dashboardMonth);
       this.renderCurrentTab();
     });
 
@@ -709,10 +734,10 @@ class SalesManager {
 
     document.querySelectorAll('.delete-monthly-exp').forEach(btn => {
       btn.addEventListener('click', async () => {
-        if (confirm('¿Eliminar este gasto extra?')) {
+        this.showConfirmModal('¿Eliminar este gasto extra?', async () => {
           await this.deleteMonthlyExpense(btn.dataset.id);
           this.renderCurrentTab();
-        }
+        });
       });
     });
   }
@@ -787,11 +812,38 @@ class SalesManager {
   }
 
   renderSalesForm(container) {
-    // Definimos todos los métodos incluyendo USD
-    const allMethods = [
-      ...Object.entries(PAYMENT_LABELS).map(([k, l]) => ({ key: k, label: l, isUSD: false, prefix: '$' })),
-      { key: 'usd_efectivo', label: 'Efectivo USD', isUSD: true, prefix: 'U$D' }
-    ];
+    const arsMethods = Object.entries(PAYMENT_LABELS).map(([k, l]) => ({ key: k, label: l, isUSD: false, prefix: '$' }));
+    const usdMethods = [{ key: 'usd_efectivo', label: 'Efectivo USD', isUSD: true, prefix: 'U$D' }];
+
+    const renderPaymentRow = (m) => `
+      <div class="payment-row" data-method="${m.key}">
+        <label class="payment-row-label">
+          ${m.label}
+          ${!m.isUSD && this.config.commissions[m.key] > 0
+            ? `<span class="badge badge-warning" style="font-size:0.65rem;">${this.config.commissions[m.key]}%</span>`
+            : ''}
+        </label>
+        <div class="payment-row-input">
+          <div class="input-group" style="flex:1;">
+            <span class="input-prefix">${m.prefix}</span>
+            <input type="number" class="registration-input payment-amount-input"
+              id="field-${m.key}" min="0" step="${m.isUSD ? '0.01' : '1'}" placeholder="0"
+              data-method="${m.key}" data-label="${m.label}" data-isusd="${m.isUSD}" />
+          </div>
+          <button type="button" class="btn btn-add-payment"
+            data-method="${m.key}" data-label="${m.label}" data-isusd="${m.isUSD}"
+            title="Añadir ${m.label}">➕</button>
+        </div>
+      </div>`;
+
+    const paymentFieldsHTML = `
+      <div class="payment-group-label">Pesos (ARS)</div>
+      ${arsMethods.map(renderPaymentRow).join('')}
+      <div class="payment-group-divider">
+        <span class="payment-group-label" style="margin: 0;">Dólares (USD)</span>
+      </div>
+      ${usdMethods.map(renderPaymentRow).join('')}
+    `;
 
     container.innerHTML = `
       <div class="section animate-in">
@@ -808,39 +860,7 @@ class SalesManager {
             </div>
 
             <div class="payment-fields-grid">
-              ${allMethods.map(m => `
-                <div class="payment-row" data-method="${m.key}">
-                  <label class="payment-row-label">
-                    ${m.label}
-                    ${!m.isUSD && this.config.commissions[m.key] > 0
-        ? `<span class="badge badge-warning" style="font-size:0.65rem;">${this.config.commissions[m.key]}%</span>`
-        : ''}
-                  </label>
-                  <div class="payment-row-input">
-                    <div class="input-group" style="flex:1;">
-                      <span class="input-prefix">${m.prefix}</span>
-                      <input
-                        type="number"
-                        class="registration-input payment-amount-input"
-                        id="field-${m.key}"
-                        min="0" step="${m.isUSD ? '0.01' : '1'}"
-                        placeholder="0"
-                        data-method="${m.key}"
-                        data-label="${m.label}"
-                        data-isusd="${m.isUSD}"
-                      />
-                    </div>
-                    <button type="button"
-                      class="btn btn-add-payment"
-                      data-method="${m.key}"
-                      data-label="${m.label}"
-                      data-isusd="${m.isUSD}"
-                      title="Añadir ${m.label}">
-                      ➕
-                    </button>
-                  </div>
-                </div>
-              `).join('')}
+              ${paymentFieldsHTML}
             </div>
           </div>
 
@@ -1016,7 +1036,7 @@ class SalesManager {
     registerAllBtn?.addEventListener('click', async () => {
       if (this.pendingEntries.length === 0) return;
       registerAllBtn.disabled = true;
-      registerAllBtn.textContent = '⏱️ Registrando...';
+      registerAllBtn.innerHTML = '<span class="btn-spinner"></span> Registrando...';
 
       let successCount = 0;
       for (const entry of this.pendingEntries) {
@@ -1185,9 +1205,10 @@ class SalesManager {
     });
 
     document.querySelectorAll('.delete-sale').forEach(b => b.addEventListener('click', async () => {
-      if (confirm('¿Seguro que deseas eliminar esta venta?')) {
+      this.showConfirmModal('¿Seguro que deseas eliminar esta venta?', async () => {
         await this.deleteSale(b.dataset.id);
-      }
+        this.renderCurrentTab();
+      });
     }));
   }
 
@@ -1284,19 +1305,19 @@ class SalesManager {
     document.getElementById('comm-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       Object.keys(PAYMENT_LABELS).forEach(k => this.config.commissions[k] = parseFloat(document.getElementById(`c-${k}`).value) || 0);
-      await this.saveConfig(); alert('Comisiones guardadas');
+      await this.saveConfig(); this.showToast('Comisiones guardadas');
     });
     document.getElementById('part-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       this.config.partners.principal.percentage = parseFloat(document.getElementById('p-p').value) || 0;
       this.config.partners.menor1.percentage = parseFloat(document.getElementById('p-m1').value) || 0;
       this.config.partners.menor2.percentage = parseFloat(document.getElementById('p-m2').value) || 0;
-      await this.saveConfig(); alert('Distribución guardada');
+      await this.saveConfig(); this.showToast('Distribución guardada');
     });
     document.getElementById('usd-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       this.config.usdRate = parseFloat(document.getElementById('u-rate').value) || 1000;
-      await this.saveConfig(); alert('Cotización guardada');
+      await this.saveConfig(); this.showToast('Cotización guardada');
     });
     document.getElementById('add-exp').addEventListener('click', () => {
       const div = document.createElement('div'); div.className = 'flex gap-md mb-md exp-item';
@@ -1309,8 +1330,25 @@ class SalesManager {
       this.config.expenses = Array.from(document.querySelectorAll('.exp-item')).map(it => ({
         id: Math.random().toString(36), name: it.querySelector('.e-n').value, amount: parseFloat(it.querySelector('.e-a').value) || 0
       }));
-      await this.saveConfig(); alert('Gastos guardados');
+      await this.saveConfig(); this.showToast('Gastos guardados');
     });
+  }
+
+  showToast(message, type = 'success') {
+    const existing = document.getElementById('app-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'app-toast';
+    toast.className = `app-toast app-toast--${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    requestAnimationFrame(() => toast.classList.add('app-toast--visible'));
+    setTimeout(() => {
+      toast.classList.remove('app-toast--visible');
+      setTimeout(() => toast.remove(), 300);
+    }, 2500);
   }
 }
 

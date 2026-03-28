@@ -162,9 +162,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     .history-table th,
     .history-table td {
         padding: 6px 4px;
-        font-size: 0.7rem;
-        word-break: break-word;
-        overflow-wrap: break-word;
+        font-size: 0.8rem;
+        overflow: hidden;
+    }
+
+    .history-table td:nth-child(2) {
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     /* Proportional column widths for 4 columns */
@@ -216,6 +220,40 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* --- Toast notification --- */
+.app-toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(12px);
+    padding: 10px 20px;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 500;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.app-toast--visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.app-toast--success {
+    background: var(--success-bg);
+    color: var(--success);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.app-toast--error {
+    background: var(--danger-bg);
+    color: var(--danger);
+    border: 1px solid rgba(239, 68, 68, 0.25);
 }
 
 /* --- Login Screen --- */
@@ -401,6 +439,25 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     }
 }
 
+/* Payment group headers */
+.payment-group-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    padding: var(--spacing-sm) 0 var(--spacing-xs);
+}
+
+.payment-group-divider {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin: var(--spacing-xs) 0;
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid var(--border-color);
+}
+
 /* Payment fields */
 .payment-fields-grid {
     display: flex;
@@ -458,6 +515,22 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .btn-add-payment:active {
     transform: scale(0.95);
+}
+
+/* Spinner para botón Registrar */
+.btn-spinner {
+    display: inline-block;
+    width: 15px;
+    height: 15px;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: btn-spin 0.65s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes btn-spin {
+    to { transform: rotate(360deg); }
 }
 
 /* Pending list items */

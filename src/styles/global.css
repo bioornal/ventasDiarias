@@ -9,7 +9,7 @@
 
   --text-primary: #ffffff;
   --text-secondary: #a0a0b0;
-  --text-muted: #6b6b7b;
+  --text-muted: #8b8b9b;
 
   --accent-primary: #f59e0b;
   --accent-secondary: #d97706;
@@ -544,12 +544,14 @@ tr:hover td {
   width: 90%;
   max-height: 90vh;
   overflow-y: auto;
-  transform: scale(0.95);
-  transition: transform 0.2s ease;
+  transform: scale(0.94) translateY(-12px);
+  opacity: 0;
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease;
 }
 
 .modal-overlay.active .modal {
-  transform: scale(1);
+  transform: scale(1) translateY(0);
+  opacity: 1;
 }
 
 /* Input group */
